@@ -14,8 +14,8 @@ def cost_function(prediction, label):
     return (prediction - label) ** 2
 
 
-def cost_function_prime(prediction, label):
-    return 2 * (prediction - label)
+def cost_function_prime(label, prediction):
+    return 2 * (label - prediction)  # TODO: 2021-03-04 - is this right...?
 
 
 vectorised_sigmoid = np.vectorize(sigmoid)

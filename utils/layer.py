@@ -4,6 +4,7 @@ from utils.misc import *
 class Layer:
 
     def __init__(self, nodes, previous_layer=None, weights=None, bias=None):  # TODO  2021-02-28: Maybe a layer settings object?
+        self.learning_rate = 1
         self.previous_layer = previous_layer
         self.number_of_nodes = nodes
         self.next_layer = None
@@ -11,53 +12,96 @@ class Layer:
 
         if self.previous_layer:
             self.set_previous_layer(self.previous_layer)
-        self.weights = weights
-        self.bias = bias
 
-        self.dC_dA = 0
-        self.dZ_dA_minus_one = 0
-        self.dA_dZ = 0
         self.Z = 0
+        self.dCost_dY = None
+
+        self.weights = weights
+        if self.weights is None:
+            self.total_dCost_dW = 0
+        else:
+            self.total_dCost_dW = np.zeros(self.weights.shape)
+
+        self.bias = bias
+        if self.bias is None:
+            self.total_dCost_dB = 0
+        else:
+            self.total_dCost_dB = np.zeros(self.bias.shape)
 
     def __len__(self):
         return self.number_of_nodes
 
-    def activate(self, previous_layer_activation=None):
-        if previous_layer_activation is None:
-            self.Z = np.dot(self.weights, self.previous_layer.activation) + self.bias
-        else:
-            self.Z = np.dot(self.weights, previous_layer_activation) + self.bias
+    def activate(self):
+        self.Z = np.dot(self.weights, self.previous_layer.activation) + self.bias
         self.activation = vectorised_sigmoid(self.Z)
         return self.activation
 
     def set_previous_layer(self, layer):
         self.previous_layer = layer
         self.previous_layer.next_layer = self
-        self.weights = np.zeros([self.number_of_nodes,
-                                 len(self.previous_layer)])
-        self.bias = np.zeros([self.number_of_nodes, 1])
 
     def randomise_weights(self):
-        self.weights = np.random.rand(self.number_of_nodes,
-                                      len(self.previous_layer))
+        self.weights = np.random.uniform(size=(self.number_of_nodes, len(self.previous_layer)),
+                                         low=0.1,
+                                         high=1)
 
     def randomise_bias(self):
-        self.bias = np.random.rand(self.number_of_nodes, 1)
+        self.bias = np.random.uniform(size=(self.number_of_nodes, 1),
+                                      low=0.1,
+                                      high=1)
 
-    def calculate_dZ_dA_minus_one(self):
-        self.dZ_dA_minus_one = self.next_layer.weights
-        return self.dZ_dA_minus_one
+    def apply_accumulations(self):
+        self.weights = self.weights - self.learning_rate * self.total_dCost_dW
+        self.bias = self.bias - self.learning_rate * self.total_dCost_dB
+        self.total_dCost_dW = np.zeros(self.weights.shape)
+        self.total_dCost_dB = np.zeros(self.bias.shape)
 
-    def calculate_dA_dZ(self):
-        self.dA_dZ = vectorised_sigmoid_prime(self.Z)
-        return self.dA_dZ
+    def evaluate_deltas(self, y=None):
+        self.calculate_dCost_dY(y=y)
+        self.accumulate_weights()
+        self.accumulate_bias()
 
-    def calculate_dC_dA(self, y=None):
+    def accumulate_weights(self):
+        self.total_dCost_dW += self._dCost_dW() * self.learning_rate
+
+    def accumulate_bias(self):
+        self.total_dCost_dB += self._dCost_dB() * self.learning_rate
+
+    def cost(self, y):
+        diff = y - self.activation
+        diff_squared = diff ** 2
+        total_diff_squared = diff_squared.sum()
+        m = self.activation.shape[1]
+        return total_diff_squared / (2 * m)
+
+    def calculate_dCost_dY(self, y=None):
         if y is None:
-            self.dC_dA = sum(np.dot(np.diag(self.next_layer.dA_dZ), self.dZ_dA_minus_one) * self.next_layer.dC_dA)
+            self.dCost_dY = np.dot(self.next_layer.dZ_dA(), self.next_layer.dCost_dZ())
         else:
-            self.dC_dA = vectorised_cost_function_prime(self.activation, y)
+            y_minus_y_hat = y - self.activation
+            m = y.shape[1]
+            self.dCost_dY = - y_minus_y_hat / m
+        return self.dCost_dY
 
-    def update_all_deltas(self):
-        self.calculate_dZ_dA_minus_one()
-        self.calculate_dA_dZ()
+    def dY_dZ(self):
+        return self.activation * (1 - self.activation)
+
+    def dZ_dW(self):
+        return self.previous_layer.activation.T
+
+    def dZ_dB(self):
+        return np.ones((self.number_of_nodes, 1), dtype=float)
+
+    def dZ_dA(self):
+        return self.weights.T
+
+    def dCost_dZ(self):
+        return self.dCost_dY * self.dY_dZ()
+
+    def _dCost_dW(self):
+        return np.dot(self.dCost_dZ(), self.dZ_dW())
+
+    def _dCost_dB(self):
+        multiply = self.dCost_dZ() * self.dZ_dB()
+        sum_of_rows = np.dot(multiply, np.ones(multiply.shape[1]))[np.newaxis].T
+        return sum_of_rows
