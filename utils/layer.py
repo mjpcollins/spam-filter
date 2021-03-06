@@ -3,8 +3,8 @@ from utils.misc import *
 
 class Layer:
 
-    def __init__(self, nodes, previous_layer=None, weights=None, bias=None):  # TODO  2021-02-28: Maybe a layer settings object?
-        self.learning_rate = 1
+    def __init__(self, nodes, previous_layer=None, weights=None, bias=None, learning_rate=1):  # TODO  2021-02-28: Maybe a layer settings object?
+        self.learning_rate = learning_rate
         self.previous_layer = previous_layer
         self.number_of_nodes = nodes
         self.next_layer = None
@@ -56,22 +56,17 @@ class Layer:
         self.total_dCost_dW = np.zeros(self.weights.shape)
         self.total_dCost_dB = np.zeros(self.bias.shape)
 
-    def evaluate_deltas(self, y=None):
-        self.calculate_dCost_dY(y=y)
-        self.accumulate_weights()
-        self.accumulate_bias()
-
     def accumulate_weights(self):
-        self.total_dCost_dW += self._dCost_dW() * self.learning_rate
+        self.total_dCost_dW += self._dCost_dW()
 
     def accumulate_bias(self):
-        self.total_dCost_dB += self._dCost_dB() * self.learning_rate
+        self.total_dCost_dB += self._dCost_dB()
 
     def cost(self, y):
         diff = y - self.activation
         diff_squared = diff ** 2
         total_diff_squared = diff_squared.sum()
-        m = self.activation.shape[1]
+        m = self.activation.size
         return total_diff_squared / (2 * m)
 
     def calculate_dCost_dY(self, y=None):
@@ -79,8 +74,7 @@ class Layer:
             self.dCost_dY = np.dot(self.next_layer.dZ_dA(), self.next_layer.dCost_dZ())
         else:
             y_minus_y_hat = y - self.activation
-            m = y.shape[1]
-            self.dCost_dY = - y_minus_y_hat / m
+            self.dCost_dY = - y_minus_y_hat / y.size
         return self.dCost_dY
 
     def dY_dZ(self):
