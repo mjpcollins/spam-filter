@@ -40,9 +40,11 @@ class NeuralNetwork:
                     print(accuracy)
 
     def get_training_batch(self, batch, rows_in_segment):
-        training_dataset_batch = self._training_features[:, batch * rows_in_segment: (batch + 1) * rows_in_segment]
-        training_labels_batch = self._training_labels[batch * rows_in_segment: (batch + 1) * rows_in_segment]
-        return training_dataset_batch, training_labels_batch
+        segment_from = batch * rows_in_segment
+        segment_to = (batch + 1) * rows_in_segment
+        training_features_batch = self._training_features[segment_from:segment_to, ]
+        training_labels_batch = self._training_labels[segment_from:segment_to]
+        return training_features_batch, training_labels_batch
 
     def forward_propagation(self, training_dataset_batch, training_labels_batch):
         accuracy = self.classification_accuracy(features=training_dataset_batch,
