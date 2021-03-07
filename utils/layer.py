@@ -1,20 +1,19 @@
-from utils.misc import *
+import numpy as np
+from utils.misc import vectorised_sigmoid
 
 
 class Layer:
 
-    def __init__(self, nodes, previous_layer=None, weights=None, bias=None, learning_rate=1):  # TODO  2021-02-28: Maybe a layer settings object?
-        self.learning_rate = learning_rate
-        self.previous_layer = previous_layer
+    def __init__(self, nodes, previous_layer=None, weights=None, bias=None, learning_rate=1):
         self.number_of_nodes = nodes
-        self.next_layer = None
         self.activation = np.zeros([self.number_of_nodes, 1])
+        self.learning_rate = learning_rate
+        self.dCost_dY = None
 
+        self.next_layer = None
+        self.previous_layer = previous_layer
         if self.previous_layer:
             self.set_previous_layer(self.previous_layer)
-
-        self.Z = 0
-        self.dCost_dY = None
 
         self.weights = weights
         if self.weights is None:
@@ -28,12 +27,8 @@ class Layer:
         else:
             self.total_dCost_dB = np.zeros(self.bias.shape)
 
-    def __len__(self):
-        return self.number_of_nodes
-
     def activate(self):
-        self.Z = np.dot(self.weights, self.previous_layer.activation) + self.bias
-        self.activation = vectorised_sigmoid(self.Z)
+        self.activation = vectorised_sigmoid(np.dot(self.weights, self.previous_layer.activation) + self.bias)
         return self.activation
 
     def set_previous_layer(self, layer):
@@ -41,7 +36,7 @@ class Layer:
         self.previous_layer.next_layer = self
 
     def randomise_weights(self):
-        self.weights = np.random.uniform(size=(self.number_of_nodes, len(self.previous_layer)),
+        self.weights = np.random.uniform(size=(self.number_of_nodes, self.previous_layer.number_of_nodes),
                                          low=0.1,
                                          high=1)
 
@@ -57,17 +52,16 @@ class Layer:
         self.total_dCost_dB = np.zeros(self.bias.shape)
 
     def accumulate_weights(self):
-        self.total_dCost_dW += self._dCost_dW()
+        self.total_dCost_dW += self.dCost_dW()
 
     def accumulate_bias(self):
-        self.total_dCost_dB += self._dCost_dB()
+        self.total_dCost_dB += self.dCost_dB()
 
     def cost(self, y):
-        diff = y - self.activation
-        diff_squared = diff ** 2
-        total_diff_squared = diff_squared.sum()
+        error_squared = (y - self.activation) ** 2
+        total_error_squared = error_squared.sum()
         m = self.activation.size
-        return total_diff_squared / (2 * m)
+        return total_error_squared / (2 * m)
 
     def calculate_dCost_dY(self, y=None):
         if y is None:
@@ -92,10 +86,10 @@ class Layer:
     def dCost_dZ(self):
         return self.dCost_dY * self.dY_dZ()
 
-    def _dCost_dW(self):
+    def dCost_dW(self):
         return np.dot(self.dCost_dZ(), self.dZ_dW())
 
-    def _dCost_dB(self):
+    def dCost_dB(self):
         multiply = self.dCost_dZ() * self.dZ_dB()
         sum_of_rows = np.dot(multiply, np.ones(multiply.shape[1]))[np.newaxis].T
         return sum_of_rows
